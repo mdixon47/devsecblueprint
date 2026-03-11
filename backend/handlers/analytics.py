@@ -9,6 +9,7 @@ import os
 from typing import Dict, Any, Set
 from datetime import datetime, timezone, timedelta
 from collections import defaultdict
+from auth.admin import is_admin
 from auth.jwt_utils import validate_jwt, extract_token_from_cookie
 from services.dynamo import (
     get_all_users_progress,
@@ -21,9 +22,6 @@ from utils.responses import error_response, json_response
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
-
-# Admin GitHub usernames (GitHub login usernames, e.g., "damienjburks")
-ADMIN_USERS = os.environ["ADMIN_USERS"].split(",")
 
 
 def handle_get_analytics(headers: Dict[str, str]) -> Dict[str, Any]:
@@ -60,9 +58,9 @@ def handle_get_analytics(headers: Dict[str, str]) -> Dict[str, Any]:
         username = payload.get("name")
         github_username = payload.get("github_login")
 
-        if not github_username or github_username not in ADMIN_USERS:
+        if not is_admin(github_username, username):
             logger.warning(
-                f"Non-admin user attempted to access analytics: {github_username}"
+                f"Non-admin user attempted to access analytics: {github_username or username}"
             )
             return error_response(403, "Forbidden - Admin access required")
 

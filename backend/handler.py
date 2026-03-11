@@ -26,6 +26,8 @@ from handlers.user import handle_get_user_profile
 from handlers.user_delete import handle_delete_account
 from handlers.quiz import handle_quiz_submit
 from handlers.walkthroughs import (
+    handle_get_walkthroughs,
+    handle_get_walkthrough,
     handle_get_progress_for_walkthrough,
     handle_update_progress as handle_walkthrough_progress,
 )
@@ -260,6 +262,9 @@ def main(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             ("GET", "/user/profile"): lambda: handle_get_user_profile(headers),
             ("DELETE", "/user/account"): lambda: handle_delete_account(headers),
             ("POST", "/quiz/submit"): lambda: handle_quiz_submit(headers, body),
+            ("GET", "/api/walkthroughs"): lambda: handle_get_walkthroughs(
+                headers, query_params
+            ),
             ("POST", "/api/email/success-story"): lambda: handle_send_success_story(
                 headers, body
             ),
@@ -286,6 +291,13 @@ def main(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 return handle_get_progress_for_walkthrough(headers, walkthrough_id)
             elif method == "POST":
                 return handle_walkthrough_progress(headers, walkthrough_id, body)
+
+        # Check for walkthrough detail route with path parameter
+        # Pattern: GET /api/walkthroughs/{id} - Get a single walkthrough
+        walkthrough_match = re.match(r"^/api/walkthroughs/([^/]+)$", path)
+        if walkthrough_match and method == "GET":
+            walkthrough_id = walkthrough_match.group(1)
+            return handle_get_walkthrough(headers, walkthrough_id)
 
         # Check for capstone submission route with path parameter
         # Pattern: GET /progress/capstone/{content_id} - Get capstone submission

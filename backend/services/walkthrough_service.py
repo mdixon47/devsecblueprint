@@ -11,11 +11,13 @@ Requirements: 10.3, 10.4, 8.4, 15.1
 from typing import Dict, List, Optional
 from pathlib import Path
 from datetime import datetime, timezone
-from services.walkthrough_registry import get_registry, WalkthroughMetadata
-from services.dynamo import (
-    get_walkthrough_progress as get_progress_from_db,
-    save_walkthrough_progress,
-)
+
+try:
+    from backend.services.walkthrough_registry import get_registry, WalkthroughMetadata
+    from backend.services import dynamo
+except ImportError:
+    from services.walkthrough_registry import get_registry, WalkthroughMetadata
+    from services import dynamo
 
 
 def get_walkthroughs(
@@ -170,7 +172,7 @@ def get_walkthrough_progress(user_id: str, walkthrough_id: str) -> Dict:
     Requirements: 11.7
     """
     # Get progress from DynamoDB
-    progress = get_progress_from_db(user_id, walkthrough_id)
+    progress = dynamo.get_walkthrough_progress(user_id, walkthrough_id)
 
     # If no record exists, return default not_started status
     if progress is None:
@@ -208,7 +210,7 @@ def update_walkthrough_progress(user_id: str, walkthrough_id: str, status: str) 
         raise ValueError(f"Invalid status: {status}. Must be one of {valid_statuses}")
 
     # Get current progress to check if record exists
-    current_progress = get_progress_from_db(user_id, walkthrough_id)
+    current_progress = dynamo.get_walkthrough_progress(user_id, walkthrough_id)
 
     # Prepare timestamp values
     started_at = None
@@ -234,7 +236,7 @@ def update_walkthrough_progress(user_id: str, walkthrough_id: str, status: str) 
             started_at = completed_at
 
     # Save the progress record
-    save_walkthrough_progress(
+    dynamo.save_walkthrough_progress(
         user_id=user_id,
         walkthrough_id=walkthrough_id,
         status=status,

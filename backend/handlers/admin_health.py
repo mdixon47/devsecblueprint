@@ -62,10 +62,15 @@ def handle_get_module_health(
     Validates: Requirements 3.1, 3.2, 3.3, 3.4, 3.5, 3.6
     """
     try:
-        # Get S3 bucket from environment
-        s3_bucket = os.environ.get("CONTENT_REGISTRY_BUCKET")
+        # Get S3 bucket from environment. Support the legacy CONTENT_BUCKET
+        # name used in tests/local tooling as a fallback.
+        s3_bucket = os.environ.get("CONTENT_REGISTRY_BUCKET") or os.environ.get(
+            "CONTENT_BUCKET"
+        )
         if not s3_bucket:
-            logger.error("CONTENT_REGISTRY_BUCKET environment variable not set")
+            logger.error(
+                "CONTENT_REGISTRY_BUCKET/CONTENT_BUCKET environment variable not set"
+            )
             return error_response(503, "Service unavailable")
 
         # Get registry service instance
@@ -139,22 +144,22 @@ def build_module_health(registry_service) -> Dict[str, Any]:
 
     # Process each entry
     for topic_slug, entry in entries.items():
-        # Validate entry first (checks if it's a dict)
+        # Count by content type for dictionary entries even if they have validation
+        # errors so the type breakdown still reflects the actual registry contents.
+        if isinstance(entry, dict):
+            content_type = entry.get("content_type", "module")
+            if content_type in content_by_type:
+                content_by_type[content_type] += 1
+            else:
+                content_by_type["module"] += 1
+        else:
+            # Completely malformed entries are counted as generic modules.
+            content_by_type["module"] += 1
+
         errors = validate_entry(entry, topic_slug)
         if errors:
             modules_with_errors.add(topic_slug)
             validation_errors.extend(errors)
-            # Count invalid entries as modules for total count
-            content_by_type["module"] += 1
-            continue
-
-        # Count by content type (only for valid dict entries)
-        content_type = entry.get("content_type", "module")
-        if content_type in content_by_type:
-            content_by_type[content_type] += 1
-        else:
-            # Unknown content type - count as module
-            content_by_type["module"] += 1
 
     # Calculate metrics
     total_modules = len(entries)
@@ -185,11 +190,8 @@ def validate_entry(entry: Dict[str, Any], topic_slug: str) -> List[Dict[str, Any
     Validate a single registry entry for critical errors only.
 
     The registry contains metadata that references content stored separately.
-    Quizzes, walkthroughs, and other content are stored as separate files,
-    so the registry entry doesn't need to contain the full content data.
-
-    This validation only checks for structural issues that would prevent
-    the registry from functioning, not content completeness.
+    Most entries do not need deep validation, but when inline quiz metadata is
+    present we validate the minimal fields the admin dashboard explicitly reports.
 
     Args:
         entry: Registry entry to validate
@@ -202,11 +204,6 @@ def validate_entry(entry: Dict[str, Any], topic_slug: str) -> List[Dict[str, Any
     """
     errors = []
 
-    # No validation needed - the registry is just metadata
-    # Content (quizzes, walkthroughs, etc.) is stored separately in CodeCommit
-    # and fetched during build. The registry entry just needs to exist.
-
-    # Only flag entries that are completely malformed (e.g., not a dict)
     if not isinstance(entry, dict):
         errors.append(
             {
@@ -215,6 +212,31 @@ def validate_entry(entry: Dict[str, Any], topic_slug: str) -> List[Dict[str, Any
                 "error_message": "Registry entry must be a dictionary",
             }
         )
+
+        return errors
+
+    if entry.get("content_type") == "quiz" and "quiz" in entry:
+        quiz_metadata = entry.get("quiz")
+
+        if not isinstance(quiz_metadata, dict):
+            errors.append(
+                {
+                    "module_id": topic_slug,
+                    "error_type": "invalid_structure",
+                    "error_message": "Quiz metadata must be a dictionary",
+                }
+            )
+            return errors
+
+        for field_name in ("passing_score", "questions"):
+            if field_name not in quiz_metadata:
+                errors.append(
+                    {
+                        "module_id": topic_slug,
+                        "error_type": "missing_field",
+                        "error_message": f"Required field '{field_name}' is missing",
+                    }
+                )
 
     return errors
 

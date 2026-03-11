@@ -89,10 +89,15 @@ def handle_get_registry_status(
                 )
                 return json_response(200, cache["data"])
 
-        # Get S3 bucket from environment
-        s3_bucket = os.environ.get("CONTENT_REGISTRY_BUCKET")
+        # Get S3 bucket from environment. Support the legacy CONTENT_BUCKET
+        # name used in tests/local tooling as a fallback.
+        s3_bucket = os.environ.get("CONTENT_REGISTRY_BUCKET") or os.environ.get(
+            "CONTENT_BUCKET"
+        )
         if not s3_bucket:
-            logger.error("CONTENT_REGISTRY_BUCKET environment variable not set")
+            logger.error(
+                "CONTENT_REGISTRY_BUCKET/CONTENT_BUCKET environment variable not set"
+            )
             return error_response(503, "Service unavailable")
 
         # Get registry service instance

@@ -8,9 +8,20 @@ import json
 import pytest
 from unittest.mock import patch, MagicMock
 
-# Add backend directory to Python path for imports
-backend_dir = os.path.join(os.path.dirname(__file__), "..", "backend")
-sys.path.insert(0, os.path.abspath(backend_dir))
+# Seed admin identities before test-module imports. Several tests import admin
+# helpers at collection time, before fixtures can patch the environment.
+os.environ.setdefault("ADMIN_USERS", "damienjburks,Damien Burks")
+
+# Add both the repository root and backend directory to Python path.
+#
+# The test suite currently mixes imports like `backend.handler` with direct module
+# imports like `handler` / `services.*`, so both locations must be importable.
+repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+backend_dir = os.path.join(repo_root, "backend")
+
+for path in (repo_root, backend_dir):
+    if path not in sys.path:
+        sys.path.insert(0, path)
 
 
 @pytest.fixture(autouse=True)

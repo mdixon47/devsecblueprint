@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev -p 3001",
     "build": "npm run generate && npm run generate-walkthroughs && npm run generate-walkthroughs-data && npm run copy-walkthrough-images && npm run generate-registry && next build",
-    "start": "next start",
+    "start": "python -m http.server 3001 --directory out",
     "lint": "eslint",
     "test": "jest",
     "test:watch": "jest --watch",

@@ -15,8 +15,17 @@ from utils.responses import error_response
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-# Admin GitHub usernames (GitHub login usernames, e.g., "damienjburks")
-ADMIN_USERS = os.environ["ADMIN_USERS"].split(",")
+
+def _parse_admin_users(admin_users: str | None) -> List[str]:
+    """Parse the ADMIN_USERS environment variable into a normalized list."""
+    if not admin_users:
+        return []
+
+    return [user.strip() for user in admin_users.split(",") if user.strip()]
+
+
+# Kept for compatibility with existing tests/imports.
+ADMIN_USERS = _parse_admin_users(os.environ.get("ADMIN_USERS"))
 
 
 def require_admin(handler: Callable) -> Callable:
@@ -83,17 +92,18 @@ def require_admin(handler: Callable) -> Callable:
             user_id = payload.get("sub")
             github_username = payload.get("github_login")
 
-            # Check if user is admin (using GitHub username)
-            if not github_username or github_username not in ADMIN_USERS:
+            # Check if user is admin using either the GitHub login username
+            # or the display name embedded in older test tokens.
+            if not is_admin(github_username, username):
                 log_admin_access(
                     endpoint=endpoint_name,
                     username=username,
                     user_id=user_id,
                     success=False,
-                    reason="GitHub username not in ADMIN_USERS list",
+                    reason="User not in ADMIN_USERS list",
                 )
                 logger.warning(
-                    f"Non-admin user attempted to access {endpoint_name}: {github_username} (user_id: {user_id})"
+                    f"Non-admin user attempted to access {endpoint_name}: {github_username or username} (user_id: {user_id})"
                 )
                 return error_response(403, "Forbidden - Admin access required")
 
@@ -177,12 +187,13 @@ def log_admin_access(
     logger.info(f"ADMIN_ACCESS_LOG: {log_entry}")
 
 
-def is_admin(github_username: str | None) -> bool:
+def is_admin(github_username: str | None, username: str | None = None) -> bool:
     """
-    Check if a GitHub username is in the admin users list.
+    Check if a user identity is in the admin users list.
 
     Args:
         github_username: GitHub login username (from JWT github_login claim)
+        username: Display name or legacy username claim from the JWT
 
     Returns:
         bool: True if user is admin, False otherwise
@@ -193,9 +204,15 @@ def is_admin(github_username: str | None) -> bool:
         >>> is_admin("someuser")
         False
     """
-    if not github_username:
+    admin_users = get_admin_users()
+    if not admin_users:
         return False
-    return github_username in ADMIN_USERS
+
+    return any(
+        candidate in admin_users
+        for candidate in (github_username, username)
+        if candidate
+    )
 
 
 def get_admin_users() -> List[str]:
@@ -209,4 +226,8 @@ def get_admin_users() -> List[str]:
         >>> get_admin_users()
         ['damienjburks', 'anotheruser']
     """
-    return ADMIN_USERS.copy()
+    admin_users = os.environ.get("ADMIN_USERS")
+    if admin_users is None:
+        return ADMIN_USERS
+
+    return _parse_admin_users(admin_users)

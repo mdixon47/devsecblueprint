@@ -13,6 +13,10 @@ A modern, clean Next.js application for The DevSec Blueprint learning platform w
 
 ## Getting Started
 
+> **Note**: This open-source checkout contains the platform code, but the curated
+> curriculum content is maintained separately. Commands that generate pages from
+> `frontend/content/` require that content source to be available locally.
+
 ### Prerequisites
 
 - Node.js 18+ and npm
@@ -50,7 +54,7 @@ Run the development server:
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3001](http://localhost:3001) with your browser to see the result.
 
 ### Building for Production
 
@@ -60,11 +64,13 @@ Build the application:
 npm run build
 ```
 
-Start the production server:
+Preview the exported static site locally:
 
 ```bash
 npm start
 ```
+
+This serves the generated `out/` directory at [http://localhost:3001](http://localhost:3001).
 
 ## Environment Variables
 
@@ -92,7 +98,7 @@ frontend/
 │   │   └── useProgress.ts # Progress tracking hook
 │   ├── types.ts          # TypeScript types
 │   └── constants.ts      # App constants
-├── content/              # Markdown content files
+├── content/              # Optional local curriculum content (maintained separately)
 ├── public/               # Static assets
 └── styles/               # Global styles
 ```
@@ -122,6 +128,8 @@ All API calls automatically include credentials (cookies) for authentication.
 ## Development
 
 ### Adding New Content
+
+If you have access to the separately maintained curriculum content locally:
 
 1. Create a markdown file in `content/{learning-path}/{topic}/`
 2. Add frontmatter with required fields

@@ -4,19 +4,15 @@ Progress reset handler for admin users.
 Allows admin users to reset their progress data.
 """
 
-import os
-import json
 import logging
 from typing import Dict, Any
+from auth.admin import is_admin
 from auth.jwt_utils import validate_jwt, extract_token_from_cookie
 from services.dynamo import delete_all_user_progress
 from utils.responses import error_response, json_response
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
-
-# Admin GitHub usernames (GitHub login usernames, e.g., "damienjburks")
-ADMIN_USERS = os.environ["ADMIN_USERS"].split(",")
 
 
 def handle_reset_progress(headers: Dict[str, str]) -> Dict[str, Any]:
@@ -58,9 +54,11 @@ def handle_reset_progress(headers: Dict[str, str]) -> Dict[str, Any]:
             f"Reset request from user_id: {user_id}, username: {username}, github_username: {github_username}"
         )
 
-        # Check if user is admin (check GitHub username)
-        if not github_username or github_username not in ADMIN_USERS:
-            logger.warning(f"Non-admin user attempted reset: {github_username}")
+        # Check if user is admin using either GitHub login or display name.
+        if not is_admin(github_username, username):
+            logger.warning(
+                f"Non-admin user attempted reset: {github_username or username}"
+            )
             return error_response(403, "Forbidden - Admin access required")
 
         # Delete all progress for this user
